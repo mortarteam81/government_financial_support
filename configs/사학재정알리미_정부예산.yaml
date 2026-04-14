@@ -1,0 +1,131 @@
+# =============================================================================
+#  CSV Dashboard Harness — 프로젝트 설정 파일
+#  ★ 새 프로젝트 시작 시 이 파일만 수정하면 됩니다 ★
+#
+#  [AI에게 전달할 프롬프트 예시]
+#  "config.yaml의 columns 섹션을 내 CSV 컬럼명에 맞게 수정해줘.
+#   내 CSV 헤더는 다음과 같아: [헤더 붙여넣기]"
+# =============================================================================
+
+# ── 프로젝트 기본 정보 ──────────────────────────────────────────────────────
+project:
+  name: "중앙정부_대학예산지원"          # 출력 파일명 접두사로 사용
+  description: "사학재정알리미 2015~2024 회계연도 중앙정부 대학 예산지원 현황"
+
+# ── 입력 데이터 ─────────────────────────────────────────────────────────────
+data:
+  file: "data.csv"                        # CSV 파일 경로 (run.py 기준 상대경로)
+  encoding: "utf-8-sig"                   # 한글 CSV는 보통 utf-8-sig 또는 cp949
+  low_memory: false
+
+# ── 핵심 컬럼 매핑 ──────────────────────────────────────────────────────────
+#  entity  : 분석 대상 개체 (대학, 기업, 지역 등)
+#  time    : 시계열 축 (연도, 분기, 월 등 — 정수로 변환 가능해야 함)
+#  value   : 측정값 (금액, 인원, 건수 등)
+columns:
+  entity: "대학명"
+  time:   "연도"
+  value:  "지원액(천원)"
+
+  # 값 단위 변환
+  value_transform:
+    multiply: 0.00001          # 천원 × 0.00001 = 억원 (소수 반올림)
+    label: "억원"              # 차트·표에 표시될 단위
+
+  # 필터 차원: 사이드바 칩(chip) 필터로 표시됨
+  #   - col   : CSV 컬럼명
+  #   - label : UI 표시명
+  filter_dims:
+    - col:   "학제"
+      label: "학제"
+    - col:   "설립"
+      label: "설립 유형"
+    - col:   "소재지"
+      label: "소재지"
+
+  # 그룹 차원: 부처별·유형별 등 2차 분석에 사용됨
+  #   - normalize: 표기 불일치 통일 (선택)
+  group_dims:
+    - col:   "지원부처명"
+      label: "지원부처"
+
+    - col:   "사업유형"
+      label: "사업유형"
+      normalize:
+        "학자금지원사업":             "학자금 지원사업"
+        "국공립대경상운영비지원사업": "국·공립대 경상운영비 지원사업"
+        "경상운영비 지원사업":        "국·공립대 경상운영비 지원사업"
+
+# ── 대시보드 UI 설정 ─────────────────────────────────────────────────────────
+dashboard:
+  title:    "🏛️ 중앙정부 대학 예산지원 현황"
+  subtitle: "2015~2024 회계연도 · 출처: 사학재정알리미"
+  theme:    "dark"             # dark | light (현재 dark만 지원)
+
+  # KPI 카드 (최대 4개 권장)
+  kpi:
+    - label: "선택 대학 수"
+      type:  "entity_count"
+      unit:  "개 대학"
+    - label: "기간 내 총 지원액"
+      type:  "value_sum"
+    - label: "최대 지원 대학"
+      type:  "top_entity"
+    - label: "최근연도 대비 증감"
+      type:  "growth_rate"
+      from_period: 2023
+      to_period:   2024
+
+  # 배지 (헤더 우측 표시)
+  badges:
+    - "490개 대학"
+    - "45개 부처"
+
+  # 프리셋 버튼 정의
+  #   type: entity_list   → entities 목록으로 지정
+  #   type: filter_match  → filter_dims 조건으로 지정
+  #   type: top_n         → 합산 기준 상위 N개
+  presets:
+    - label: "서울 사립대"
+      type:  "filter_match"
+      match:
+        소재지: "서울"
+        설립:   "사립"
+        학제:   "대학"
+
+    - label: "서울 여대 6개"
+      type:   "entity_list"
+      entities:
+        - "성신여자대학교"
+        - "이화여자대학교"
+        - "숙명여자대학교"
+        - "동덕여자대학교"
+        - "서울여자대학교"
+        - "덕성여자대학교"
+
+    - label: "지방거점국립"
+      type:  "filter_match"
+      match:
+        설립: "국립"
+        학제: "대학"
+      exclude_match:
+        소재지: ["서울", "경기", "인천", "수도권"]
+
+    - label: "지원액 TOP 10"
+      type:   "top_n"
+      n:      10
+
+# ── 출력 설정 ────────────────────────────────────────────────────────────────
+output:
+  dir: "./output"
+  html:
+    enabled:  true
+    filename: "dashboard.html"   # {project.name}_{filename} 으로 저장됨
+
+  # 향후 확장 슬롯 (현재 미구현)
+  # excel:
+  #   enabled: false
+  # pptx:
+  #   enabled: false
+  # report_md:
+  #   enabled: false

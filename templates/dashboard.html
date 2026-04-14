@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<!--
+  CSV Dashboard Harness — 범용 대시보드 템플릿
+  ─────────────────────────────────────────────
+  이 파일은 직접 편집하지 마세요.
+  대시보드 동작은 config.yaml을 수정해서 제어합니다.
+
+  인라인 치환 마커:
+    __DATA_PLACEHOLDER__   → preprocessor가 생성한 payload JSON
+    __CONFIG_PLACEHOLDER__ → builder가 생성한 ui_config JSON
+-->
+<style>
+:root {
+  --bg:       #0f1117;
+  --surface:  #1a1d2e;
+  --surface2: #222540;
+  --border:   #2d3158;
+  --accent:   #6c7ef8;
+  --accent2:  #f87c6c;
+  --accent3:  #6cf8b4;
+  --text:     #e8eaf6;
+  --text-dim: #8b90b8;
+  --tier-top: #f87c6c;
+  --tier-mid: #f8d76c;
+  --tier-low: #6cf8b4;
+  --radius:   10px;
+  --shadow:   0 2px 12px rgba(0,0,0,0.4);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+/* Header */
+.header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;}
+.header h1{font-size:1.1rem;font-weight:700;}
+.header .subtitle{font-size:0.78rem;color:var(--text-dim);margin-top:2px;}
+.badge{background:var(--accent);color:#fff;border-radius:20px;padding:2px 10px;font-size:0.72rem;font-weight:600;}
+/* Layout */
+.layout{display:flex;flex:1;overflow:hidden;}
+.sidebar{width:280px;min-width:240px;background:var(--surface);border-right:1px solid var(--border);padding:16px;overflow-y:auto;display:flex;flex-direction:column;gap:14px;}
+.main{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:18px;}
+/* Filter */
+.filter-section{display:flex;flex-direction:column;gap:6px;}
+.filter-label{font-size:0.72rem;font-weight:700;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;}
+.filter-chips{display:flex;flex-wrap:wrap;gap:5px;}
+.chip{padding:3px 10px;border-radius:20px;font-size:0.72rem;cursor:pointer;background:var(--surface2);color:var(--text-dim);border:1px solid var(--border);transition:all .15s;user-select:none;}
+.chip.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.chip:hover:not(.active){border-color:var(--accent);color:var(--accent);}
+/* Search */
+.search-wrap{position:relative;}
+.search-input{width:100%;padding:7px 12px 7px 32px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:.82rem;outline:none;transition:border .15s;}
+.search-input:focus{border-color:var(--accent);}
+.search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--text-dim);pointer-events:none;}
+/* Entity list */
+.entity-list{max-height:240px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface2);margin-top:4px;}
+.entity-item{padding:6px 10px;font-size:.78rem;cursor:pointer;color:var(--text-dim);display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--border);transition:background .1s;}
+.entity-item:last-child{border-bottom:none;}
+.entity-item:hover{background:rgba(108,126,248,.12);color:var(--text);}
+.entity-item.selected{color:var(--accent);}
+.entity-item .check{width:14px;height:14px;border:1.5px solid var(--border);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:.65rem;flex-shrink:0;}
+.entity-item.selected .check{background:var(--accent);border-color:var(--accent);color:#fff;}
+.selected-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+.tag{background:rgba(108,126,248,.2);color:var(--accent);border:1px solid rgba(108,126,248,.4);border-radius:20px;padding:2px 8px;font-size:.7rem;display:flex;align-items:center;gap:4px;}
+.tag .remove{cursor:pointer;font-weight:700;}
+/* Year slider */
+.year-display{font-size:.8rem;color:var(--accent);font-weight:600;text-align:center;}
+.range-track{position:relative;height:24px;display:flex;align-items:center;}
+.range-input{position:absolute;width:100%;-webkit-appearance:none;appearance:none;height:4px;background:transparent;pointer-events:none;outline:none;}
+.range-input::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--accent);cursor:pointer;pointer-events:all;box-shadow:0 0 4px rgba(108,126,248,.5);}
+.range-fill{position:absolute;height:4px;background:var(--accent);border-radius:2px;pointer-events:none;}
+.range-bg{position:absolute;width:100%;height:4px;background:var(--border);border-radius:2px;}
+/* Buttons */
+.btn{padding:7px 14px;border-radius:var(--radius);font-size:.78rem;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#7d8ef9;}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border);}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent);}
+.btn-row{display:flex;gap:6px;}
+.preset-btn{padding:4px 8px;border-radius:6px;font-size:.7rem;cursor:pointer;border:1px solid var(--border);background:var(--surface2);color:var(--text-dim);transition:all .15s;}
+.preset-btn:hover{border-color:var(--accent3);color:var(--accent3);}
+/* KPI */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+.kpi-label{font-size:.72rem;color:var(--text-dim);margin-bottom:4px;}
+.kpi-value{font-size:1.4rem;font-weight:700;}
+.kpi-sub{font-size:.7rem;color:var(--text-dim);margin-top:2px;}
+/* Tabs */
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);}
+.tab-btn{padding:8px 18px;font-size:.82rem;font-weight:600;cursor:pointer;border:none;background:transparent;color:var(--text-dim);border-bottom:2px solid transparent;margin-bottom:-1px;transition:all .15s;}
+.tab-btn.active{color:var(--accent);border-bottom-color:var(--accent);}
+.tab-btn:hover:not(.active){color:var(--text);}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+/* Chart card */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;box-shadow:var(--shadow);}
+.chart-title{font-size:.88rem;font-weight:700;margin-bottom:4px;}
+.chart-desc{font-size:.73rem;color:var(--text-dim);margin-bottom:12px;}
+.chart-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:.78rem;}
+.data-table th{background:var(--surface2);color:var(--text-dim);font-weight:600;padding:8px 10px;text-align:left;border-bottom:1px solid var(--border);font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;cursor:pointer;user-select:none;}
+.data-table th:hover{color:var(--accent);}
+.data-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text-dim);}
+.data-table tr:hover td{background:rgba(108,126,248,.06);color:var(--text);}
+.data-table td.hl{color:var(--text);font-weight:600;}
+.table-wrap{max-height:420px;overflow-y:auto;border-radius:var(--radius);border:1px solid var(--border);}
+/* Scrollbar */
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:var(--surface);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+::-webkit-scrollbar-thumb:hover{background:var(--accent);}
+.empty-state{display:flex;align-items:center;justify-content:center;height:200px;color:var(--text-dim);font-size:.85rem;flex-direction:column;gap:8px;}
+.tier-top{color:var(--tier-top);font-weight:700;}
+.tier-mid{color:var(--tier-mid);font-weight:700;}
+.tier-low{color:var(--tier-low);font-weight:700;}
+@media(max-width:1100px){.kpi-row{grid-template-columns:repeat(2,1fr)}.chart-grid-2{grid-template-columns:1fr}}
+@media(max-width:768px){.layout{flex-direction:column}.sidebar{width:100%;max-height:350px}}
+</style>
+</head>
+<body>
+
+<!-- ── 헤더 (config.title / subtitle / badges) ── -->
+<div class="header" id="appHeader">
+  <div>
+    <h1 id="appTitle">Dashboard</h1>
+    <div class="subtitle" id="appSubtitle"></div>
+  </div>
+  <div id="appBadges"></div>
+</div>
+
+<div class="layout">
+<!-- ══════════════════════════════════════
+     사이드바
+══════════════════════════════════════ -->
+<aside class="sidebar">
+
+  <!-- 연도 슬라이더 -->
+  <div class="filter-section">
+    <div class="filter-label">📅 기간</div>
+    <div>
+      <div class="year-display" id="yearDisplay">-</div>
+      <div class="range-track">
+        <div class="range-bg"></div>
+        <div class="range-fill" id="rangeFill"></div>
+        <input type="range" class="range-input" id="yearMin" step="1">
+        <input type="range" class="range-input" id="yearMax" step="1">
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:.68rem;color:var(--text-dim);">
+        <span id="yearMinLabel"></span><span id="yearMaxLabel"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 필터 차원 칩 (config.filter_dims에서 동적 생성) -->
+  <div id="filterDimsContainer"></div>
+
+  <!-- 개체 검색 + 멀티셀렉트 -->
+  <div class="filter-section">
+    <div class="filter-label" id="entitySearchLabel">🔍 검색 및 선택</div>
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="entitySearch" placeholder="이름 입력...">
+    </div>
+    <div class="entity-list" id="entityList"></div>
+    <div style="font-size:.7rem;color:var(--text-dim);margin-top:4px;" id="entityCount"></div>
+    <div class="selected-tags" id="selectedTags"></div>
+  </div>
+
+  <!-- 프리셋 -->
+  <div class="filter-section" id="presetSection" style="display:none;">
+    <div class="filter-label">⚡ 프리셋</div>
+    <div id="presetBtns" style="display:flex;flex-wrap:wrap;gap:5px;"></div>
+  </div>
+
+  <!-- 적용 / 초기화 -->
+  <div class="btn-row">
+    <button class="btn btn-primary" style="flex:1" onclick="applyFilters()">필터 적용</button>
+    <button class="btn btn-ghost" onclick="resetFilters()">초기화</button>
+  </div>
+</aside>
+
+<!-- ══════════════════════════════════════
+     메인
+══════════════════════════════════════ -->
+<main class="main">
+
+  <!-- KPI 카드 (config.kpi에서 동적 생성) -->
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- 탭 -->
+  <div>
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('trend',event)">📈 시계열 추이</button>
+      <button class="tab-btn"        onclick="switchTab('rank',event)">🏆 기간별 순위</button>
+      <button class="tab-btn"        onclick="switchTab('group',event)">🏢 그룹별 현황</button>
+      <button class="tab-btn"        onclick="switchTab('table',event)">📊 데이터 테이블</button>
+    </div>
+
+    <!-- 탭 1: 시계열 추이 -->
+    <div class="tab-panel active" id="tab-trend" style="padding-top:16px;">
+      <div class="chart-card">
+        <div class="chart-title" id="trendTitle">개체별 시계열 추이</div>
+        <div class="chart-desc">선택한 개체들의 연도별 값 변화. 미선택 시 상위 15개 자동 표시.</div>
+        <div id="trendChart" style="height:420px;"></div>
+      </div>
+      <div class="chart-grid-2" style="margin-top:16px;">
+        <div class="chart-card">
+          <div class="chart-title">합산 추이 + 전년 증감률</div>
+          <div class="chart-desc">선택 개체 합산 기준 연도별 바차트 및 증감률(꺾은선)</div>
+          <div id="totalTrendChart" style="height:280px;"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">개체당 평균값 추이</div>
+          <div class="chart-desc">필터 조건 내 개체당 평균값 연도별 추이</div>
+          <div id="avgTrendChart" style="height:280px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 탭 2: 순위 -->
+    <div class="tab-panel" id="tab-rank" style="padding-top:16px;">
+      <div class="chart-card">
+        <div class="chart-title">기간별 개체 순위</div>
+        <div class="chart-desc">
+          선택 기간의 합산값 기준 순위 &nbsp;·&nbsp;
+          <span class="tier-top">■ 상위 33%</span>&nbsp;
+          <span class="tier-mid">■ 중위 33%</span>&nbsp;
+          <span class="tier-low">■ 하위 33%</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;">
+          <label style="font-size:.78rem;color:var(--text-dim);">기준 연도:</label>
+          <select id="rankYear" onchange="renderRankChart()"
+            style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:.8rem;"></select>
+          <label style="font-size:.78rem;color:var(--text-dim);">표시:</label>
+          <select id="rankTopN" onchange="renderRankChart()"
+            style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:.8rem;">
+            <option value="20">상위 20개</option>
+            <option value="30">상위 30개</option>
+            <option value="50">상위 50개</option>
+            <option value="all">전체</option>
+          </select>
+        </div>
+        <div id="rankChart" style="height:500px;"></div>
+      </div>
+      <div class="chart-card" style="margin-top:16px;">
+        <div class="chart-title">상/중/하위 그룹 추이</div>
+        <div class="chart-desc">필터 내 개체를 3분위로 나눈 그룹별 연도별 평균값</div>
+        <div id="tierTrendChart" style="height:300px;"></div>
+      </div>
+    </div>
+
+    <!-- 탭 3: 그룹별 현황 -->
+    <div class="tab-panel" id="tab-group" style="padding-top:16px;">
+      <div id="groupTabsInner"></div>
+    </div>
+
+    <!-- 탭 4: 데이터 테이블 -->
+    <div class="tab-panel" id="tab-table" style="padding-top:16px;">
+      <div class="chart-card">
+        <div class="chart-title">개체 × 연도 상세 테이블</div>
+        <div class="chart-desc">필터 조건에 해당하는 개체의 연도별 값. 헤더 클릭 시 정렬.</div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead id="tableHead"></thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <div style="margin-top:8px;font-size:.72rem;color:var(--text-dim);" id="tableInfo"></div>
+      </div>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+// ════════════════════════════════════════════
+//  데이터 & 설정 (빌더가 치환)
+// ════════════════════════════════════════════
+const DATA   = __DATA_PLACEHOLDER__;
+const CONFIG = __CONFIG_PLACEHOLDER__;
+
+// ════════════════════════════════════════════
+//  Plotly 공통 레이아웃
+// ════════════════════════════════════════════
+const PL = {
+  paper_bgcolor:'transparent', plot_bgcolor:'transparent',
+  font:{family:"'Pretendard','Apple SD Gothic Neo',sans-serif", color:'#8b90b8', size:11},
+  xaxis:{gridcolor:'#2d3158', linecolor:'#2d3158', zerolinecolor:'#2d3158'},
+  yaxis:{gridcolor:'#2d3158', linecolor:'#2d3158', zerolinecolor:'#2d3158'},
+  legend:{bgcolor:'rgba(26,29,46,.8)', bordercolor:'#2d3158', borderwidth:1},
+  margin:{l:60, r:20, t:30, b:40},
+  colorway:['#6c7ef8','#f87c6c','#6cf8b4','#f8d76c','#c46cf8','#6cb8f8',
+            '#f8a46c','#6cf8e8','#f86ca8','#a4f86c','#6c8cf8','#f8f86c'],
+};
+const TIER = {top:'#f87c6c', mid:'#f8d76c', low:'#6cf8b4'};
+
+// ════════════════════════════════════════════
+//  전역 상태
+// ════════════════════════════════════════════
+let S = {
+  tMin: 0, tMax: 0,
+  filters: {},        // {col: [선택값, ...]}
+  selected: [],       // 선택된 개체 목록
+};
+let FD = { entityYear:[], entityYearSel:[], entityMeta:[] };
+
+// ════════════════════════════════════════════
+//  초기화
+// ════════════════════════════════════════════
+function init() {
+  // 헤더
+  document.getElementById('appTitle').textContent    = CONFIG.title;
+  document.getElementById('appSubtitle').textContent = CONFIG.subtitle;
+  document.title = CONFIG.title;
+  const badgesEl = document.getElementById('appBadges');
+  CONFIG.badges.forEach((b,i) => {
+    const el = document.createElement('span');
+    el.className = 'badge';
+    if (i===1) el.style.background='var(--accent2)';
+    el.textContent = b;
+    badgesEl.appendChild(el);
+  });
+
+  // 탐색 레이블
+  document.getElementById('entitySearchLabel').textContent =
+    `🔍 ${CONFIG.entity_label} 검색 및 선택`;
+
+  // 연도 슬라이더
+  const times = DATA.times;
+  S.tMin = times[0]; S.tMax = times[times.length-1];
+  const minIn = document.getElementById('yearMin');
+  const maxIn = document.getElementById('yearMax');
+  [minIn, maxIn].forEach(el => {
+    el.min = S.tMin; el.max = S.tMax;
+  });
+  minIn.value = S.tMin; maxIn.value = S.tMax;
+  document.getElementById('yearMinLabel').textContent = S.tMin;
+  document.getElementById('yearMaxLabel').textContent = S.tMax;
+  updateSlider();
+  minIn.oninput = maxIn.oninput = updateSlider;
+
+  // 필터 차원 칩
+  buildFilterDims();
+
+  // 개체 검색
+  document.getElementById('entitySearch').oninput = e =>
+    renderEntityList(e.target.value.trim());
+
+  // 순위 연도 select
+  const rankYear = document.getElementById('rankYear');
+  [...times].reverse().forEach(y => {
+    const o = document.createElement('option');
+    o.value = y; o.text = y;
+    rankYear.appendChild(o);
+  });
+
+  // KPI 카드
+  buildKpiCards();
+
+  // 프리셋
+  buildPresets();
+
+  // 그룹 탭 내부
+  buildGroupTabsInner();
+
+  applyFilters();
+}
+
+// ════════════════════════════════════════════
+//  슬라이더
+// ════════════════════════════════════════════
+function updateSlider() {
+  const minIn = document.getElementById('yearMin');
+  const maxIn = document.getElementById('yearMax');
+  let lo = +minIn.value, hi = +maxIn.value;
+  if (lo > hi) { [lo,hi]=[hi,lo]; minIn.value=lo; maxIn.value=hi; }
+  S.tMin = lo; S.tMax = hi;
+  document.getElementById('yearDisplay').textContent = lo===hi ? lo : `${lo} – ${hi}`;
+  const total = DATA.times[DATA.times.length-1] - DATA.times[0];
+  const fill = document.getElementById('rangeFill');
+  fill.style.left  = ((lo-DATA.times[0])/total*100)+'%';
+  fill.style.right = ((DATA.times[DATA.times.length-1]-hi)/total*100)+'%';
+}
+
+// ════════════════════════════════════════════
+//  필터 차원 칩 빌더 (config.filter_dims 기반)
+// ════════════════════════════════════════════
+function buildFilterDims() {
+  const container = document.getElementById('filterDimsContainer');
+  container.innerHTML = '';
+  CONFIG.filter_dims.forEach(dim => {
+    S.filters[dim.col] = [];
+    const vals = DATA.filter_values[dim.col] || [];
+    if (!vals.length) return;
+    const section = document.createElement('div');
+    section.className = 'filter-section';
+    section.innerHTML = `<div class="filter-label">${dim.label}</div>
+      <div class="filter-chips" id="chips_${dim.col}"></div>`;
+    container.appendChild(section);
+    const wrap = section.querySelector('.filter-chips');
+    vals.forEach(v => {
+      const el = document.createElement('div');
+      el.className = 'chip';
+      el.textContent = v;
+      el.onclick = () => {
+        const arr = S.filters[dim.col];
+        const idx = arr.indexOf(v);
+        if (idx>-1) { arr.splice(idx,1); el.classList.remove('active'); }
+        else         { arr.push(v);      el.classList.add('active');    }
+        renderEntityList(document.getElementById('entitySearch').value.trim());
+      };
+      wrap.appendChild(el);
+    });
+  });
+}
+
+// ════════════════════════════════════════════
+//  개체 목록
+// ════════════════════════════════════════════
+function getFilteredMeta() {
+  return DATA.entity_meta.filter(m => {
+    for (const dim of CONFIG.filter_dims) {
+      const arr = S.filters[dim.col] || [];
+      if (arr.length && !arr.includes(m[dim.col])) return false;
+    }
+    return true;
+  });
+}
+
+function renderEntityList(query) {
+  let candidates = getFilteredMeta();
+  if (query) candidates = candidates.filter(m => m.entity.includes(query));
+  candidates = candidates.slice(0, 100);
+  const list = document.getElementById('entityList');
+  list.innerHTML = '';
+  candidates.forEach(m => {
+    const isSel = S.selected.includes(m.entity);
+    const el = document.createElement('div');
+    el.className = 'entity-item'+(isSel?' selected':'');
+    el.innerHTML = `<div class="check">${isSel?'✓':''}</div><span>${m.entity}</span>`;
+    el.onclick = () => toggleEntity(m.entity);
+    list.appendChild(el);
+  });
+  document.getElementById('entityCount').textContent = `${candidates.length}개 표시 중`;
+}
+
+function toggleEntity(name) {
+  const idx = S.selected.indexOf(name);
+  if (idx>-1) S.selected.splice(idx,1); else S.selected.push(name);
+  renderEntityList(document.getElementById('entitySearch').value.trim());
+  renderSelectedTags();
+}
+
+function renderSelectedTags() {
+  const wrap = document.getElementById('selectedTags');
+  wrap.innerHTML = '';
+  S.selected.forEach(name => {
+    const el = document.createElement('div');
+    el.className = 'tag';
+    el.innerHTML = `${name}<span class="remove" onclick="toggleEntity('${name.replace(/'/g,"\\'")}')">×</span>`;
+    wrap.appendChild(el);
+  });
+}
+
+// ════════════════════════════════════════════
+//  프리셋
+// ════════════════════════════════════════════
+function buildPresets() {
+  if (!DATA.presets_data || !DATA.presets_data.length) return;
+  document.getElementById('presetSection').style.display = '';
+  const wrap = document.getElementById('presetBtns');
+  DATA.presets_data.forEach(pr => {
+    const el = document.createElement('button');
+    el.className = 'preset-btn';
+    el.textContent = pr.label;
+    el.onclick = () => applyPreset(pr);
+    wrap.appendChild(el);
+  });
+}
+
+function applyPreset(pr) {
+  S.selected = [];
+  if (pr.type === 'top_n') {
+    S.selected = DATA.entity_total.slice(0, pr.n).map(r => r.entity);
+  } else {
+    S.selected = pr.entities || [];
+  }
+  renderEntityList(document.getElementById('entitySearch').value.trim());
+  renderSelectedTags();
+  applyFilters();
+}
+
+// ════════════════════════════════════════════
+//  KPI 카드 빌더
+// ════════════════════════════════════════════
+function buildKpiCards() {
+  const row = document.getElementById('kpiRow');
+  CONFIG.kpi.forEach((k, i) => {
+    const el = document.createElement('div');
+    el.className = 'kpi-card';
+    const colors = ['var(--accent)','var(--accent3)','var(--text)','var(--text)'];
+    el.innerHTML = `
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value" id="kpi_val_${i}" style="color:${colors[i]||'var(--text)'};font-size:${i===2?'1rem':'1.4rem'}">-</div>
+      <div class="kpi-sub" id="kpi_sub_${i}">${k.unit||''}</div>`;
+    row.appendChild(el);
+  });
+}
+
+function updateKPI() {
+  const data = FD.entityYearSel;
+  CONFIG.kpi.forEach((k, i) => {
+    const valEl = document.getElementById(`kpi_val_${i}`);
+    const subEl = document.getElementById(`kpi_sub_${i}`);
+    if (!valEl) return;
+
+    if (k.type === 'entity_count') {
+      valEl.textContent = new Set(data.map(r=>r.entity)).size.toLocaleString();
+
+    } else if (k.type === 'value_sum') {
+      const total = data.reduce((s,r)=>s+r.value, 0);
+      const big = total >= 10000;
+      valEl.textContent = big ? (total/10000).toFixed(1)+'조' : Math.round(total).toLocaleString();
+      subEl.textContent = big ? '원' : CONFIG.value_label;
+
+    } else if (k.type === 'top_entity') {
+      const totals = {};
+      data.forEach(r=>{totals[r.entity]=(totals[r.entity]||0)+r.value;});
+      const top = Object.entries(totals).sort((a,b)=>b[1]-a[1])[0];
+      if (top) {
+        valEl.textContent = top[0];
+        subEl.textContent = Math.round(top[1]).toLocaleString()+' '+CONFIG.value_label;
+      }
+
+    } else if (k.type === 'growth_rate') {
+      const fp = k.from_period, tp = k.to_period;
+      const y1 = data.filter(r=>r.time===fp).reduce((s,r)=>s+r.value,0);
+      const y2 = data.filter(r=>r.time===tp).reduce((s,r)=>s+r.value,0);
+      if (y1>0) {
+        const pct = ((y2-y1)/y1*100).toFixed(1);
+        valEl.textContent = (pct>0?'+':'')+pct+'%';
+        valEl.style.color = pct>0 ? 'var(--accent3)' : 'var(--tier-top)';
+        subEl.textContent = `${fp} → ${tp}`;
+      }
+    }
+  });
+}
+
+// ════════════════════════════════════════════
+//  필터 적용
+// ════════════════════════════════════════════
+function applyFilters() {
+  const metaFiltered = getFilteredMeta();
+  const metaSet = new Set(metaFiltered.map(m=>m.entity));
+
+  FD.entityYear = DATA.entity_year.filter(r=>
+    metaSet.has(r.entity) && r.time>=S.tMin && r.time<=S.tMax
+  );
+
+  FD.entityYearSel = S.selected.length>0
+    ? FD.entityYear.filter(r=>S.selected.includes(r.entity))
+    : FD.entityYear;
+
+  FD.entityMeta = metaFiltered;
+
+  renderEntityList(document.getElementById('entitySearch').value.trim());
+  updateKPI();
+  renderCurrentTab();
+}
+
+function resetFilters() {
+  S.tMin = DATA.times[0]; S.tMax = DATA.times[DATA.times.length-1];
+  document.getElementById('yearMin').value = S.tMin;
+  document.getElementById('yearMax').value = S.tMax;
+  updateSlider();
+  CONFIG.filter_dims.forEach(d=>{ S.filters[d.col]=[]; });
+  document.querySelectorAll('.chip').forEach(c=>c.classList.remove('active'));
+  S.selected = [];
+  renderSelectedTags();
+  applyFilters();
+}
+
+// ════════════════════════════════════════════
+//  탭 전환
+// ════════════════════════════════════════════
+let currentTab = 'trend';
+function switchTab(name, ev) {
+  currentTab = name;
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  ev.currentTarget.classList.add('active');
+  document.getElementById('tab-'+name).classList.add('active');
+  renderCurrentTab();
+}
+function renderCurrentTab() {
+  if      (currentTab==='trend') { renderTrendChart(); renderTotalTrendChart(); renderAvgTrendChart(); }
+  else if (currentTab==='rank')  { renderRankChart(); renderTierTrendChart(); }
+  else if (currentTab==='group') { renderGroupCharts(); }
+  else if (currentTab==='table') { renderTable(); }
+}
+
+// 시계열 목록 헬퍼
+function getTimes() { return DATA.times.filter(t=>t>=S.tMin&&t<=S.tMax); }
+
+// ════════════════════════════════════════════
+//  탭 1: 시계열 추이
+// ════════════════════════════════════════════
+function renderTrendChart() {
+  const data = FD.entityYearSel;
+  if (!data.length) { emptyChart('trendChart'); return; }
+  const map = {};
+  data.forEach(r=>{ if(!map[r.entity])map[r.entity]={}; map[r.entity][r.time]=(map[r.entity][r.time]||0)+r.value; });
+  let univs = Object.keys(map);
+  if (univs.length>15 && S.selected.length===0) {
+    const tot={}; univs.forEach(u=>{tot[u]=Object.values(map[u]).reduce((s,v)=>s+v,0);});
+    univs = univs.sort((a,b)=>tot[b]-tot[a]).slice(0,15);
+  }
+  const times = getTimes();
+  Plotly.newPlot('trendChart',
+    univs.map(u=>({
+      type:'scatter', mode:'lines+markers', name:u,
+      x:times, y:times.map(t=>+(( map[u][t]||0)).toFixed(1)),
+      hovertemplate:`<b>${u}</b><br>%{x}: %{y:.1f} ${CONFIG.value_label}<extra></extra>`,
+    })),
+    {...PL, xaxis:{...PL.xaxis,tickmode:'array',tickvals:times,ticktext:times.map(t=>t+'년')},
+     yaxis:{...PL.yaxis,title:CONFIG.value_label}, hovermode:'x unified', margin:{l:70,r:20,t:20,b:40}},
+    {responsive:true, displayModeBar:false}
+  );
+}
+
+function renderTotalTrendChart() {
+  const times = getTimes();
+  const data  = FD.entityYearSel;
+  const totals = times.map(t=>data.filter(r=>r.time===t).reduce((s,r)=>s+r.value,0));
+  const growth = totals.map((v,i)=>i===0?null:+((v-totals[i-1])/totals[i-1]*100).toFixed(1));
+  Plotly.newPlot('totalTrendChart',[
+    {type:'bar',name:'합산값',x:times.map(t=>t+'년'),y:totals.map(Math.round),
+     marker:{color:'rgba(108,126,248,.6)'},hovertemplate:'%{x}: %{y:,}<extra></extra>'},
+    {type:'scatter',mode:'lines+markers',name:'증감률(%)',x:times.map(t=>t+'년'),y:growth,
+     yaxis:'y2',line:{color:'#f87c6c',width:2},marker:{color:'#f87c6c',size:6},
+     hovertemplate:'%{x}: %{y}%<extra></extra>'},
+  ],{...PL,yaxis:{...PL.yaxis,title:CONFIG.value_label},
+     yaxis2:{title:'증감률(%)',overlaying:'y',side:'right',gridcolor:'transparent',color:'#f87c6c'},
+     legend:{...PL.legend,orientation:'h',y:-0.25},margin:{l:60,r:55,t:20,b:60}},
+  {responsive:true,displayModeBar:false});
+}
+
+function renderAvgTrendChart() {
+  const times = getTimes();
+  const data  = FD.entityYear;
+  const avgs  = times.map(t=>{
+    const yd = data.filter(r=>r.time===t);
+    const n  = new Set(yd.map(r=>r.entity)).size;
+    return n>0 ? +(yd.reduce((s,r)=>s+r.value,0)/n).toFixed(1) : 0;
+  });
+  Plotly.newPlot('avgTrendChart',[{
+    type:'scatter',mode:'lines+markers',fill:'tozeroy',name:'평균',
+    x:times.map(t=>t+'년'),y:avgs,
+    line:{color:'#6cf8b4',width:2},fillcolor:'rgba(108,248,180,.1)',marker:{color:'#6cf8b4',size:5},
+    hovertemplate:'%{x}: 평균 %{y:.1f} '+CONFIG.value_label+'<extra></extra>',
+  }],{...PL,yaxis:{...PL.yaxis,title:'평균 '+CONFIG.value_label},margin:{l:70,r:20,t:20,b:40}},
+  {responsive:true,displayModeBar:false});
+}
+
+// ════════════════════════════════════════════
+//  탭 2: 순위
+// ════════════════════════════════════════════
+function renderRankChart() {
+  const year  = +document.getElementById('rankYear').value;
+  const topNV = document.getElementById('rankTopN').value;
+  const data  = FD.entityYear.filter(r=>r.time===year).sort((a,b)=>b.value-a.value);
+  if (!data.length) { emptyChart('rankChart'); return; }
+  const topN   = topNV==='all'?data.length:+topNV;
+  const disp   = data.slice(0,topN);
+  const n      = disp.length;
+  const selSet = new Set(S.selected);
+  const colors  = disp.map((_,i)=>i<n*.33?TIER.top:i<n*.66?TIER.mid:TIER.low);
+  const opacity = disp.map(r=>S.selected.length>0&&!selSet.has(r.entity)?0.25:1);
+  Plotly.newPlot('rankChart',[{
+    type:'bar',orientation:'h',
+    x:disp.map(r=>Math.round(r.value)).reverse(),
+    y:disp.map(r=>r.entity).reverse(),
+    marker:{color:colors.slice().reverse(),opacity:opacity.slice().reverse()},
+    hovertemplate:`<b>%{y}</b><br>${year}: %{x:,} ${CONFIG.value_label}<extra></extra>`,
+  }],{...PL,xaxis:{...PL.xaxis,title:CONFIG.value_label},yaxis:{...PL.yaxis,automargin:true},
+     height:Math.max(400,n*22),margin:{l:130,r:20,t:20,b:40}},
+  {responsive:true,displayModeBar:false});
+}
+
+function renderTierTrendChart() {
+  const times = getTimes();
+  const tier  = {top:[],mid:[],low:[]};
+  times.forEach(t=>{
+    const yd = FD.entityYear.filter(r=>r.time===t).sort((a,b)=>b.value-a.value);
+    const n  = yd.length;
+    const avg = arr=>arr.length?arr.reduce((s,r)=>s+r.value,0)/arr.length:0;
+    tier.top.push(Math.round(avg(yd.slice(0,Math.floor(n*.33)))));
+    tier.mid.push(Math.round(avg(yd.slice(Math.floor(n*.33),Math.floor(n*.66)))));
+    tier.low.push(Math.round(avg(yd.slice(Math.floor(n*.66)))));
+  });
+  Plotly.newPlot('tierTrendChart',[
+    {type:'scatter',mode:'lines+markers',name:'상위 33%',x:times.map(t=>t+'년'),y:tier.top,line:{color:TIER.top,width:2},marker:{color:TIER.top}},
+    {type:'scatter',mode:'lines+markers',name:'중위 33%',x:times.map(t=>t+'년'),y:tier.mid,line:{color:TIER.mid,width:2},marker:{color:TIER.mid}},
+    {type:'scatter',mode:'lines+markers',name:'하위 33%',x:times.map(t=>t+'년'),y:tier.low,line:{color:TIER.low,width:2},marker:{color:TIER.low}},
+  ],{...PL,yaxis:{...PL.yaxis,title:'평균 '+CONFIG.value_label},margin:{l:70,r:20,t:20,b:40}},
+  {responsive:true,displayModeBar:false});
+}
+
+// ════════════════════════════════════════════
+//  탭 3: 그룹별 현황 (config.group_dims 기반)
+// ════════════════════════════════════════════
+function buildGroupTabsInner() {
+  const container = document.getElementById('groupTabsInner');
+  if (!CONFIG.group_dims.length) {
+    container.innerHTML='<div class="empty-state"><div>ℹ️</div><div>config.yaml에 group_dims가 정의되지 않았습니다.</div></div>';
+    return;
+  }
+  // 각 group_dim에 대해 라인+파이+히트맵 카드 생성
+  CONFIG.group_dims.forEach(dim=>{
+    const sec = document.createElement('div');
+    sec.id = `group_sec_${dim.col}`;
+    sec.style.marginBottom='20px';
+    sec.innerHTML=`
+      <div class="chart-grid-2">
+        <div class="chart-card">
+          <div class="chart-title">${dim.label}별 연도별 추이</div>
+          <div class="chart-desc">주요 ${dim.label}의 연도별 합산값</div>
+          <div id="gTrend_${dim.col}" style="height:320px;"></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-title">${dim.label}별 비중</div>
+          <div class="chart-desc">선택 기간 내 ${dim.label}별 합산 비중</div>
+          <div id="gPie_${dim.col}" style="height:320px;"></div>
+        </div>
+      </div>
+      <div class="chart-card" style="margin-top:16px;">
+        <div class="chart-title">${dim.label} × 연도 히트맵</div>
+        <div class="chart-desc">각 ${dim.label}의 연도별 값 분포</div>
+        <div id="gHeat_${dim.col}" style="height:360px;"></div>
+      </div>`;
+    container.appendChild(sec);
+  });
+}
+
+function renderGroupCharts() {
+  const times = getTimes();
+  CONFIG.group_dims.forEach(dim=>{
+    const records = (DATA.group_year[dim.col]||[]).filter(r=>r.time>=S.tMin&&r.time<=S.tMax);
+    // 상위 그룹
+    const groupTotals={};
+    records.forEach(r=>{groupTotals[r.group]=(groupTotals[r.group]||0)+r.value;});
+    const topGroups=Object.entries(groupTotals).sort((a,b)=>b[1]-a[1]).slice(0,10).map(e=>e[0]);
+
+    // 라인
+    Plotly.newPlot(`gTrend_${dim.col}`,
+      topGroups.map(g=>({
+        type:'scatter',mode:'lines+markers',name:g,
+        x:times.map(t=>t+'년'),
+        y:times.map(t=>{const r=records.find(d=>d.group===g&&d.time===t);return r?Math.round(r.value):0;}),
+        hovertemplate:`<b>${g}</b><br>%{x}: %{y:,} ${CONFIG.value_label}<extra></extra>`,
+      })),
+      {...PL,yaxis:{...PL.yaxis,title:CONFIG.value_label},margin:{l:70,r:20,t:20,b:40}},
+      {responsive:true,displayModeBar:false}
+    );
+
+    // 파이
+    Plotly.newPlot(`gPie_${dim.col}`,[{
+      type:'pie',labels:topGroups,values:topGroups.map(g=>Math.round(groupTotals[g])),
+      hole:.4,textinfo:'percent+label',textfont:{size:10},
+      hovertemplate:'<b>%{label}</b><br>%{value:,} '+CONFIG.value_label+' (%{percent})<extra></extra>',
+    }],{paper_bgcolor:'transparent',plot_bgcolor:'transparent',font:PL.font,colorway:PL.colorway,
+        legend:{...PL.legend,orientation:'v',x:1,y:.5},margin:{l:10,r:130,t:20,b:20}},
+    {responsive:true,displayModeBar:false});
+
+    // 히트맵
+    Plotly.newPlot(`gHeat_${dim.col}`,[{
+      type:'heatmap',x:times.map(t=>t+'년'),y:topGroups,
+      z:topGroups.map(g=>times.map(t=>{const r=records.find(d=>d.group===g&&d.time===t);return r?Math.round(r.value):0;})),
+      colorscale:[[0,'#1a1d2e'],[.3,'#2d3158'],[.6,'rgba(108,126,248,.6)'],[1,'#6c7ef8']],
+      hovertemplate:'<b>%{y}</b><br>%{x}: %{z:,} '+CONFIG.value_label+'<extra></extra>',
+    }],{...PL,yaxis:{...PL.yaxis,automargin:true},margin:{l:160,r:20,t:20,b:50}},
+    {responsive:true,displayModeBar:false});
+  });
+}
+
+// ════════════════════════════════════════════
+//  탭 4: 데이터 테이블
+// ════════════════════════════════════════════
+let tSortKey='합계', tSortAsc=false;
+function renderTable() {
+  const times = getTimes();
+  const data  = FD.entityYearSel;
+  const map={};
+  data.forEach(r=>{
+    if(!map[r.entity]) map[r.entity]={entity:r.entity};
+    CONFIG.filter_dims.forEach(d=>{map[r.entity][d.col]=r[d.col]||'-';});
+    map[r.entity][r.time]=(map[r.entity][r.time]||0)+r.value;
+  });
+  let rows=Object.values(map);
+  rows.forEach(r=>{r['합계']=times.reduce((s,t)=>s+(r[t]||0),0);});
+  rows.sort((a,b)=>{
+    const va=a[tSortKey]||0,vb=b[tSortKey]||0;
+    return typeof va==='string'
+      ? (tSortAsc?va.localeCompare(vb,'ko'):vb.localeCompare(va,'ko'))
+      : (tSortAsc?va-vb:vb-va);
+  });
+  const dimCols = CONFIG.filter_dims.map(d=>d.col);
+  const cols = ['entity',...dimCols,...times,'합계'];
+  const colLabels = {'entity':CONFIG.entity_label,...Object.fromEntries(CONFIG.filter_dims.map(d=>[d.col,d.label]))};
+
+  document.getElementById('tableHead').innerHTML='<tr>'+cols.map(c=>
+    `<th onclick="sortTable('${c}')">${colLabels[c]||c}${c===tSortKey?(tSortAsc?' ▲':' ▼'):''}</th>`
+  ).join('')+'</tr>';
+
+  document.getElementById('tableBody').innerHTML=rows.map(r=>
+    '<tr>'+cols.map((c,i)=>{
+      const v=r[c];
+      if(typeof v==='number'){
+        const fmt=v>=1000?Math.round(v).toLocaleString():v.toFixed(1);
+        return `<td${c==='합계'?' class="hl"':''}>${fmt}</td>`;
+      }
+      return `<td${i===0?' class="hl"':''}>${v||'-'}</td>`;
+    }).join('')+'</tr>'
+  ).join('');
+
+  document.getElementById('tableInfo').textContent=`총 ${rows.length}개 · 단위: ${CONFIG.value_label}`;
+}
+function sortTable(key){
+  tSortAsc = tSortKey===key ? !tSortAsc : true;
+  tSortKey = key;
+  renderTable();
+}
+
+// ════════════════════════════════════════════
+//  유틸
+// ════════════════════════════════════════════
+function emptyChart(id){
+  document.getElementById(id).innerHTML=
+    '<div class="empty-state"><div>📭</div><div>조건에 해당하는 데이터가 없습니다.</div></div>';
+}
+
+// ── 진입점 ──
+init();
+</script>
+</body>
+</html>
