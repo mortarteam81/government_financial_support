@@ -1,0 +1,66 @@
+project:
+  name: "샘플_테스트"
+  description: "동작 확인용 샘플 데이터 (5개 대학 × 5개 연도)"
+
+data:
+  file: "sample_data.csv"
+  encoding: "utf-8-sig"
+  low_memory: false
+
+columns:
+  entity: "대학명"
+  time:   "연도"
+  value:  "지원액(천원)"
+  value_transform:
+    multiply: 0.00001
+    label: "억원"
+  filter_dims:
+    - col:   "학제"
+      label: "학제"
+    - col:   "설립"
+      label: "설립 유형"
+    - col:   "소재지"
+      label: "소재지"
+  group_dims:
+    - col:   "지원부처명"
+      label: "지원부처"
+    - col:   "사업유형"
+      label: "사업유형"
+
+dashboard:
+  title:    "🧪 샘플 데이터 테스트 대시보드"
+  subtitle: "동작 확인용 샘플 (실제 데이터 사용 시 config.yaml 참고)"
+  theme:    "dark"
+  kpi:
+    - label: "선택 대학 수"
+      type:  "entity_count"
+      unit:  "개 대학"
+    - label: "기간 내 총 지원액"
+      type:  "value_sum"
+    - label: "최대 지원 대학"
+      type:  "top_entity"
+    - label: "최근연도 대비 증감"
+      type:  "growth_rate"
+      from_period: 2023
+      to_period:   2024
+  badges:
+    - "5개 대학 (샘플)"
+    - "5개 연도"
+  presets:
+    - label: "국립대"
+      type:  "filter_match"
+      match:
+        설립: "국립"
+    - label: "서울 소재"
+      type:  "filter_match"
+      match:
+        소재지: "서울"
+    - label: "TOP 3"
+      type:  "top_n"
+      n:     3
+
+output:
+  dir: "./output"
+  html:
+    enabled:  true
+    filename: "dashboard.html"

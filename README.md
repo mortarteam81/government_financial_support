@@ -97,3 +97,29 @@ columns:
 
 - `docs/IR시각화시스템_구축계획안.docx` — 시스템 구축 계획(안) 공문
 - `docs/IR시각화시스템_구축결과보고안.docx` — 시스템 구축 결과보고(안) 공문
+
+---
+
+## 데이터 준비
+
+### 테스트 (즉시 실행 가능)
+```bash
+# 레포에 포함된 샘플 데이터로 동작 확인
+python run.py -c configs/sample_test.yaml
+```
+→ `output/샘플_테스트_dashboard.html` 생성 확인
+
+### 실제 데이터 사용
+사학재정알리미에서 원본 CSV 다운로드 후 `data.csv`로 저장:
+
+1. **사학재정알리미** (https://www.esf.go.kr) 접속
+2. 상단 메뉴 → **통계 · 공시** → **대학별 중앙정부예산지원현황**
+3. 연도 범위 설정 (2015~2024) → **Excel 다운로드** → `data.csv`로 저장
+4. 아래 명령 실행:
+
+```bash
+python run.py -c config.yaml
+```
+→ `output/중앙정부_대학예산지원_dashboard.html` 생성
+
+> **참고**: 원본 CSV 파일(`data.csv`)은 `.gitignore`에 의해 레포에서 제외됩니다.
